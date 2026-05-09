@@ -1,0 +1,23 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # 每週一 UTC 02:00（台灣時間週一 10:00）
+  workflow_dispatch:      # 允許手動觸發
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase（代購網站）
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://ouaoeyenwwlfupyhauux.supabase.co/rest/v1/products?select=id&limit=1" \
+            -H "apikey: sb_publishable_o6ZRGK2PQ-ihxux_ACbXrQ_yaRFyCG2" \
+            -H "Authorization: Bearer sb_publishable_o6ZRGK2PQ-ihxux_ACbXrQ_yaRFyCG2")
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Supabase 代購網站 正常"
+          else
+            echo "⚠️ Supabase 代購網站 回應異常: $STATUS"
+          fi
