@@ -2,7 +2,7 @@ name: Supabase Keep Alive
 
 on:
   schedule:
-    - cron: '0 2 * * 1'  # 每週一 UTC 02:00（台灣時間週一 10:00）
+    - cron: '0 2 * * *'  # 每天 UTC 02:00（台灣時間每天 10:00）
   workflow_dispatch:      # 允許手動觸發
 
 jobs:
