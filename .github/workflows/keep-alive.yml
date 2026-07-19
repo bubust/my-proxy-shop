@@ -1,23 +1,17 @@
-name: Supabase Keep Alive
+name: Keep Supabase Alive
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 每天 UTC 02:00（台灣時間每天 10:00）
-  workflow_dispatch:      # 允許手動觸發
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase（代購網站）
+      - name: Ping Supabase
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://vsrpidzljcaevcychyii.supabase.co/rest/v1/products?select=id&limit=1" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcnBpZHpsamNhZXZjeWNoeWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjQzMzQsImV4cCI6MjA5NDg0MDMzNH0.kOwNvAQZGyYILP8D7NUoUNqS-P39yHpIU7blw-AHtI8" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcnBpZHpsamNhZXZjeWNoeWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjQzMzQsImV4cCI6MjA5NDg0MDMzNH0.kOwNvAQZGyYILP8D7NUoUNqS-P39yHpIU7blw-AHtI8")
-          echo "HTTP Status: $STATUS"
-          if [ "$STATUS" = "200" ]; then
-            echo "Supabase 代購網站 正常"
-          else
-            echo "Supabase 代購網站 回應異常: $STATUS"
-          fi
+          curl -s "https://vsrpidzljcaevcychyii.supabase.co/rest/v1/site_settings?select=key&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcnBpZHpsamNhZXZjeWNoeWlpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTI2NDMzNCwiZXhwIjoyMDk0ODQwMzM0fQ.tz8Qc8h3JPw4z-ljT1M2-mYFltF4Tk_cBj3Lm_P6rwM" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcnBpZHpsamNhZXZjeWNoeWlpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTI2NDMzNCwiZXhwIjoyMDk0ODQwMzM0fQ.tz8Qc8h3JPw4z-ljT1M2-mYFltF4Tk_cBj3Lm_P6rwM" \
+            -o /dev/null -w "Status: %{http_code}\n"
