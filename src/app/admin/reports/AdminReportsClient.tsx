@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Order, OrderItem } from '@/types'
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, startOfWeek, startOfMonth, subMonths } from 'date-fns'
-import { ShoppingBag, Package, ClipboardList, Download, Pencil, X } from 'lucide-react'
+import { ShoppingBag, Package, ClipboardList, Download, Pencil, X, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -47,6 +47,7 @@ function EditOrderModal({ order, onClose, onSaved }: { order: FullOrder; onClose
     tracking_number: order.tracking_number ?? '',
   })
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }))
 
@@ -65,6 +66,19 @@ function EditOrderModal({ order, onClose, onSaved }: { order: FullOrder; onClose
     setSaving(false)
     if (error) { toast.error('儲存失敗：' + error.message); return }
     toast.success('訂單已更新')
+    onSaved()
+    onClose()
+  }
+
+  const deleteOrder = async () => {
+    if (!confirm(`確定要刪除訂單 ${order.order_number}？此操作無法復原。`)) return
+    setDeleting(true)
+    const { error: e1 } = await supabase.from('order_items').delete().eq('order_id', order.id)
+    if (e1) { toast.error('刪除明細失敗：' + e1.message); setDeleting(false); return }
+    const { error: e2 } = await supabase.from('orders').delete().eq('id', order.id)
+    setDeleting(false)
+    if (e2) { toast.error('刪除訂單失敗：' + e2.message); return }
+    toast.success('訂單已刪除')
     onSaved()
     onClose()
   }
@@ -143,10 +157,14 @@ function EditOrderModal({ order, onClose, onSaved }: { order: FullOrder; onClose
             </div>
           )}
         </div>
-        <div className="px-5 pb-5">
-          <button onClick={save} disabled={saving}
+        <div className="px-5 pb-5 space-y-2">
+          <button onClick={save} disabled={saving || deleting}
             className="w-full bg-[#e85d26] text-white py-3 rounded-xl font-semibold hover:bg-[#f47848] transition-colors disabled:opacity-50">
             {saving ? '儲存中…' : '儲存變更'}
+          </button>
+          <button onClick={deleteOrder} disabled={saving || deleting}
+            className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-500 py-2.5 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50">
+            <Trash2 size={14} /> {deleting ? '刪除中…' : '刪除此訂單'}
           </button>
         </div>
       </div>
