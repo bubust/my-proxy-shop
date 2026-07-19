@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import type { Order } from '@/types'
 import { useRouter } from 'next/navigation'
+import { Copy, Bell } from 'lucide-react'
 
 const ORDER_STATUSES = [
   { value: 'pending', label: '待確認' },
@@ -29,6 +30,12 @@ export default function AdminOrderActions({ order }: { order: Order }) {
   const [adminNote, setAdminNote] = useState(order.admin_note ?? '')
   const [saving, setSaving] = useState(false)
   const router = useRouter()
+
+  const copyShippingNotice = () => {
+    const trackingInfo = tracking ? `\n物流追蹤號碼：${tracking}` : ''
+    const msg = `【雪寶代購 出貨通知】\n\n您好，您的訂單 ${order.order_number} 已出貨！${trackingInfo}\n\n如有任何問題請隨時聯繫，感謝您的支持！`
+    navigator.clipboard.writeText(msg).then(() => toast.success('通知訊息已複製，可貼上傳給客人')).catch(() => toast.error('複製失敗'))
+  }
 
   const save = async () => {
     setSaving(true)
@@ -102,6 +109,15 @@ export default function AdminOrderActions({ order }: { order: Order }) {
       >
         {saving ? '儲存中…' : '儲存變更'}
       </button>
+
+      {(status === 'shipped' || order.status === 'shipped' || order.status === 'arrived' || order.status === 'completed') && (
+        <button
+          onClick={copyShippingNotice}
+          className="mt-2 w-full flex items-center justify-center gap-2 border border-blue-200 text-blue-600 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-50 transition-colors"
+        >
+          <Bell size={14} /> 複製出貨通知訊息
+        </button>
+      )}
     </div>
   )
 }

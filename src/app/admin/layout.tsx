@@ -4,11 +4,12 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const NAV_LINKS = [
   { href: '/admin', label: '📊 儀表板', exact: true },
-  { href: '/admin/products', label: '📦 商品管理' },
   { href: '/admin/orders', label: '📋 訂單管理' },
-  { href: '/admin/members', label: '👥 會員列表' },
+  { href: '/admin/products', label: '📦 商品管理' },
   { href: '/admin/reports', label: '📈 統計報表' },
-  { href: '/admin/settings', label: '⚙️ 首頁設定' },
+  { href: '/admin/coupons', label: '🏷️ 優惠券' },
+  { href: '/admin/members', label: '👥 會員列表' },
+  { href: '/admin/settings', label: '⚙️ 設定' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

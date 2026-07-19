@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBag, Tag, CheckCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,6 +12,9 @@ import { getCart, updateCartItem, removeFromCart, clearCart } from '@/lib/cart'
 import type { CartItem } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+
+const SHIPPING_FEE = 60
+const FREE_SHIPPING_THRESHOLD = 5500
 
 const schema = z.object({
   recipient_name: z.string().min(2, '請輸入收件人姓名'),
@@ -24,6 +27,10 @@ type FormData = z.infer<typeof schema>
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponInput, setCouponInput] = useState('')
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [couponChecking, setCouponChecking] = useState(false)
   const router = useRouter()
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
@@ -32,7 +39,6 @@ export default function CartPage() {
 
   useEffect(() => {
     setItems(getCart())
-    // 自動帶入會員資料
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       const { data: profile } = await supabase.from('profiles').select('name, phone, address').eq('id', user.id).single()
@@ -51,9 +57,40 @@ export default function CartPage() {
   }
 
   const updateQty = (item: CartItem, qty: number) => refresh(updateCartItem(item.product_id, qty, item.size, item.color))
-  const remove = (item: CartItem) => refresh(removeFromCart(item.product_id, item.size, item.color))
+  const remove = (item: CartItem) => {
+    refresh(removeFromCart(item.product_id, item.size, item.color))
+    // Clear coupon if cart becomes empty
+    setCouponCode(''); setDiscountAmount(0); setCouponInput('')
+  }
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE
+  const total = subtotal + shippingFee - discountAmount
+
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return
+    setCouponChecking(true)
+    try {
+      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(couponInput.trim())}&amount=${subtotal}`)
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        toast.error(data.error || '優惠券無效')
+        return
+      }
+      setCouponCode(couponInput.trim().toUpperCase())
+      setDiscountAmount(data.discount)
+      toast.success(`折扣 NT$ ${data.discount} 已套用！`)
+    } catch {
+      toast.error('驗證失敗，請稍後再試')
+    } finally {
+      setCouponChecking(false)
+    }
+  }
+
+  const removeCoupon = () => {
+    setCouponCode(''); setDiscountAmount(0); setCouponInput('')
+    toast.success('已移除優惠券')
+  }
 
   const onSubmit = async (data: FormData) => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -74,7 +111,10 @@ export default function CartPage() {
         .insert({
           user_id: user.id,
           subtotal,
-          total: subtotal,
+          shipping_fee: shippingFee,
+          discount_amount: discountAmount,
+          coupon_code: couponCode || null,
+          total: Math.max(0, total),
           recipient_name: data.recipient_name,
           recipient_phone: data.recipient_phone,
           shipping_address: data.shipping_address,
@@ -99,6 +139,11 @@ export default function CartPage() {
 
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
+
+      // Increment coupon usage if coupon applied
+      if (couponCode) {
+        await fetch(`/api/coupons/use`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: couponCode }) })
+      }
 
       clearCart()
       window.dispatchEvent(new Event('cart-updated'))
@@ -166,20 +211,68 @@ export default function CartPage() {
 
         {/* Order form */}
         <div className="md:col-span-2">
+          {/* Order summary */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
             <h2 className="font-semibold text-[#1a1a1a] mb-3">訂單摘要</h2>
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>小計（{items.length} 件商品）</span>
+              <span>小計（{items.reduce((s, i) => s + i.quantity, 0)} 件）</span>
               <span>NT$ {subtotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-500 mb-3">
-              <span>運費</span>
-              <span>確認後通知</span>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-600">運費</span>
+              {shippingFee === 0 ? (
+                <span className="text-green-600 font-medium">免運費</span>
+              ) : (
+                <span className="text-gray-700">NT$ {shippingFee}</span>
+              )}
             </div>
-            <div className="flex justify-between font-bold text-[#1a1a1a]">
-              <span>預估金額</span>
-              <span className="text-[#e85d26]">NT$ {subtotal.toLocaleString()}</span>
+            {subtotal < FREE_SHIPPING_THRESHOLD && (
+              <p className="text-xs text-blue-500 mb-1">
+                再消費 NT$ {(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString()} 即可免運！
+              </p>
+            )}
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm text-green-600 mb-1">
+                <span>優惠折扣（{couponCode}）</span>
+                <span>- NT$ {discountAmount.toLocaleString()}</span>
+              </div>
+            )}
+            <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between font-bold text-[#1a1a1a]">
+              <span>總計</span>
+              <span className="text-[#e85d26]">NT$ {Math.max(0, total).toLocaleString()}</span>
             </div>
+          </div>
+
+          {/* Coupon */}
+          <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+            <h2 className="font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
+              <Tag size={15} /> 優惠券
+            </h2>
+            {couponCode ? (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <CheckCircle size={14} className="text-green-600 shrink-0" />
+                <span className="text-sm text-green-700 font-mono font-semibold flex-1">{couponCode}</span>
+                <span className="text-sm text-green-700">-NT$ {discountAmount}</span>
+                <button onClick={removeCoupon} className="text-xs text-red-400 hover:text-red-600 ml-1">移除</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === 'Enter' && applyCoupon()}
+                  placeholder="輸入優惠碼"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#e85d26] uppercase"
+                />
+                <button
+                  onClick={applyCoupon}
+                  disabled={couponChecking || !couponInput.trim()}
+                  className="bg-[#1a1a1a] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {couponChecking ? '…' : '套用'}
+                </button>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
@@ -208,14 +301,14 @@ export default function CartPage() {
               <textarea {...register('note')} placeholder="特殊要求..." rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#e85d26] resize-none" />
             </div>
 
-            <p className="text-xs text-gray-400">訂單送出後，我們將與您確認代購細節與總費用。</p>
+            <p className="text-xs text-gray-400">訂單送出後，我們將與您確認代購細節。</p>
 
             <button
               type="submit"
               disabled={submitting}
               className="w-full bg-[#e85d26] text-white py-3 rounded-xl font-semibold hover:bg-[#f47848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? '送出中…' : '確認下單'}
+              {submitting ? '送出中…' : `確認下單 NT$ ${Math.max(0, total).toLocaleString()}`}
             </button>
           </form>
         </div>

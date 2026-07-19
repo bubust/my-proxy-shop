@@ -110,9 +110,29 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
             </div>
           ))}
         </div>
-        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between font-bold">
-          <span>合計</span>
-          <span className="text-[#e85d26]">NT$ {o.total.toLocaleString()}</span>
+        <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>商品小計</span>
+            <span>NT$ {o.subtotal.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>運費</span>
+            {o.shipping_fee === 0 ? (
+              <span className="text-green-600">免運費</span>
+            ) : (
+              <span>NT$ {o.shipping_fee}</span>
+            )}
+          </div>
+          {o.discount_amount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>優惠折扣{o.coupon_code ? `（${o.coupon_code}）` : ''}</span>
+              <span>- NT$ {o.discount_amount.toLocaleString()}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-[#1a1a1a] pt-1 border-t border-gray-100">
+            <span>合計</span>
+            <span className="text-[#e85d26]">NT$ {o.total.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 

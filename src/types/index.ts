@@ -72,6 +72,8 @@ export interface Order {
   payment_status: PaymentStatus
   subtotal: number
   shipping_fee: number
+  discount_amount: number
+  coupon_code: string | null
   total: number
   currency: string
   recipient_name: string
@@ -90,6 +92,19 @@ export interface Order {
     name: string
     phone: string
   }
+}
+
+export interface Coupon {
+  id: number
+  code: string
+  type: 'fixed' | 'percent'
+  value: number
+  min_amount: number
+  max_uses: number | null
+  used_count: number
+  expires_at: string | null
+  is_active: boolean
+  created_at: string
 }
 
 export interface Profile {
