@@ -49,7 +49,10 @@ export default function LoginPage() {
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { name: data.name } },
+      options: {
+        data: { name: data.name },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     })
     if (error) { setLoading(false); toast.error('註冊失敗：' + error.message); return }
     if (authData.user) {
@@ -72,7 +75,7 @@ export default function LoginPage() {
   const handleForgot = async () => {
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
     setLoading(false)
     if (error) { toast.error('發送失敗：' + error.message); return }
