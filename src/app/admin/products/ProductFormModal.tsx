@@ -214,7 +214,7 @@ export default function ProductFormModal({
       <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
           <h2 className="font-bold text-[#1a1a1a]">{product ? '編輯商品' : '新增商品'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
+          <button onClick={() => onClose()} className="p-1.5 hover:bg-gray-100 rounded-lg">
             <X size={18} />
           </button>
         </div>
