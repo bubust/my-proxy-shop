@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,10 +9,11 @@ const adminClient = createClient(
   { auth: { persistSession: false } }
 )
 
-export async function getSiteName(): Promise<string> {
+// cache() 讓同一個 request 內多次呼叫只查一次 DB
+export const getSiteName = cache(async (): Promise<string> => {
   const { data } = await adminClient.from('site_settings').select('value').eq('key', 'general').single()
   return (data?.value as { site_name?: string })?.site_name ?? 'Snow Select | 日韓代購'
-}
+})
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
