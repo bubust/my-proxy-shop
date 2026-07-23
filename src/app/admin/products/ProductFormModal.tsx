@@ -108,7 +108,7 @@ export default function ProductFormModal({
   categories: Category[]
   collections: Collection[]
   defaultCollectionId?: number | null
-  onClose: () => void
+  onClose: (saved?: Product) => void
 }) {
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [colors, setColors] = useState<string[]>(product?.colors ?? [])
@@ -196,17 +196,17 @@ export default function ProductFormModal({
       updated_at: new Date().toISOString(),
     }
 
-    let error
+    let error, saved
     if (product) {
-      ;({ error } = await supabase.from('products').update(payload).eq('id', product.id))
+      ;({ error, data: saved } = await supabase.from('products').update(payload).eq('id', product.id).select('*, categories(*), collections(*)').single())
     } else {
-      ;({ error } = await supabase.from('products').insert(payload))
+      ;({ error, data: saved } = await supabase.from('products').insert(payload).select('*, categories(*), collections(*)').single())
     }
 
     setSaving(false)
     if (error) { toast.error('儲存失敗：' + error.message); return }
     toast.success(product ? '商品已更新' : '商品已新增')
-    onClose()
+    onClose(saved)
   }
 
   return (

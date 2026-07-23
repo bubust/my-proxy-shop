@@ -7,7 +7,6 @@ import { toast } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import type { Product, Category, Collection } from '@/types'
 import ProductFormModal from './ProductFormModal'
-import { useRouter } from 'next/navigation'
 
 function NewCollectionModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c: Collection) => void }) {
   const [name, setName] = useState('')
@@ -128,10 +127,6 @@ export default function AdminProductsClient({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [moveModalOpen, setMoveModalOpen] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
-  const router = useRouter()
-
-  const refresh = () => router.refresh()
-
   const visibleProducts = activeCollection === null
     ? products.filter(p => p.collection_id === null)
     : products.filter(p => p.collection_id === activeCollection)
@@ -460,7 +455,16 @@ export default function AdminProductsClient({
           categories={categories}
           collections={collections}
           defaultCollectionId={editTarget ? undefined : activeCollection}
-          onClose={() => { setModalOpen(false); refresh() }}
+          onClose={(saved) => {
+            setModalOpen(false)
+            if (saved) {
+              if (editTarget) {
+                setProducts(prev => prev.map(p => p.id === saved.id ? saved as Product : p))
+              } else {
+                setProducts(prev => [saved as Product, ...prev])
+              }
+            }
+          }}
         />
       )}
 
