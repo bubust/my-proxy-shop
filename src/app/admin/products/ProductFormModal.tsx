@@ -81,7 +81,7 @@ function CheckboxGroup({ label, options, selected, onChange }: {
 const schema = z.object({
   name: z.string().min(1, '商品名稱必填'),
   description: z.string().optional(),
-  price: z.string().min(1, '請輸入價格'),
+  price: z.string().optional(),
   original_price: z.string().optional(),
   cost_price: z.string().optional(),
   country: z.string().optional(),
@@ -177,12 +177,26 @@ export default function ProductFormModal({
   const removeImage = (url: string) => setImages((prev) => prev.filter((i) => i !== url))
 
   const onSubmit = async (data: FormData) => {
+    // 計算有效的尺寸價格
+    const sp: Record<string, number> = {}
+    sizes.forEach(s => { if (sizePrices[s]) sp[s] = parseFloat(sizePrices[s]) })
+    const hasSizePrices = Object.keys(sp).length > 0
+
+    // 決定主要價格：有填就用，沒填且有尺寸價格就取最低值
+    const mainPrice = data.price
+      ? parseFloat(data.price)
+      : hasSizePrices
+        ? Math.min(...Object.values(sp))
+        : null
+
+    if (!mainPrice) { toast.error('請輸入代購價格，或至少填一個尺寸的價格'); return }
+
     setSaving(true)
     const tags = data.tags ? data.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
     const payload = {
       name: data.name,
       description: data.description || null,
-      price: parseFloat(data.price),
+      price: mainPrice,
       original_price: data.original_price ? parseFloat(data.original_price) : null,
       cost_price: data.cost_price ? parseFloat(data.cost_price) : null,
       country: data.country || null,
@@ -194,13 +208,7 @@ export default function ProductFormModal({
       tags,
       colors,
       sizes,
-      size_prices: sizes.length > 0
-        ? (() => {
-            const sp: Record<string, number> = {}
-            sizes.forEach(s => { if (sizePrices[s]) sp[s] = parseFloat(sizePrices[s]) })
-            return Object.keys(sp).length > 0 ? sp : null
-          })()
-        : null,
+      size_prices: hasSizePrices ? sp : null,
       images,
       collection_id: data.collection_id ? parseInt(data.collection_id) : null,
       updated_at: new Date().toISOString(),
@@ -297,8 +305,10 @@ export default function ProductFormModal({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">代購價格 *</label>
-              <input {...register('price')} type="number" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#e85d26]" />
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                代購價格 {Object.values(sizePrices).some(v => v) ? <span className="font-normal text-gray-400">（有尺寸價格時可不填）</span> : '*'}
+              </label>
+              <input {...register('price')} type="number" placeholder={Object.values(sizePrices).some(v => v) ? '自動取最低尺寸價' : ''} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#e85d26]" />
               {errors.price && <p className="text-xs text-red-500 mt-0.5">{errors.price.message}</p>}
             </div>
             <div>
