@@ -459,6 +459,7 @@ export default function AdminProductsClient({
           product={editTarget}
           categories={categories}
           collections={collections}
+          defaultCollectionId={editTarget ? undefined : activeCollection}
           onClose={() => { setModalOpen(false); refresh() }}
         />
       )}

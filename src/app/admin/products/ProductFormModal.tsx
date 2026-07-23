@@ -101,11 +101,13 @@ export default function ProductFormModal({
   product,
   categories,
   collections,
+  defaultCollectionId,
   onClose,
 }: {
   product: Product | null
   categories: Category[]
   collections: Collection[]
+  defaultCollectionId?: number | null
   onClose: () => void
 }) {
   const [images, setImages] = useState<string[]>(product?.images ?? [])
@@ -140,7 +142,7 @@ export default function ProductFormModal({
       is_featured: product.is_featured,
       tags: product.tags?.join(', ') ?? '',
       collection_id: product.collection_id != null ? String(product.collection_id) : '',
-    } : { is_available: true as boolean, is_featured: false as boolean, stock: '-1' },
+    } : { is_available: true as boolean, is_featured: false as boolean, stock: '-1', collection_id: defaultCollectionId != null ? String(defaultCollectionId) : '' },
   })
 
   const uploadImage = async (file: File, productId: string) => {
