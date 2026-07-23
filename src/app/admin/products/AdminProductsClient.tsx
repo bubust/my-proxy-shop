@@ -2,11 +2,24 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen, FolderPlus, UploadCloud, PowerOff, X, Copy, MoveRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen, FolderPlus, UploadCloud, PowerOff, X, Copy, MoveRight, GripVertical } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import type { Product, Category, Collection } from '@/types'
 import ProductFormModal from './ProductFormModal'
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+function SortableRow({ id, isSelected, children }: { id: string; isSelected: boolean; children: (dragProps: React.HTMLAttributes<HTMLElement>) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  return (
+    <tr ref={setNodeRef} style={style} className={`border-b border-gray-50 transition-colors ${isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'}`}>
+      {children({ ...attributes, ...listeners })}
+    </tr>
+  )
+}
 
 function NewCollectionModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c: Collection) => void }) {
   const [name, setName] = useState('')
@@ -127,9 +140,32 @@ export default function AdminProductsClient({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [moveModalOpen, setMoveModalOpen] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
-  const visibleProducts = activeCollection === null
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const visibleProducts = (activeCollection === null
     ? products.filter(p => p.collection_id === null)
     : products.filter(p => p.collection_id === activeCollection)
+  ).sort((a, b) => {
+    if (a.sort_order == null && b.sort_order == null) return 0
+    if (a.sort_order == null) return 1
+    if (b.sort_order == null) return -1
+    return a.sort_order - b.sort_order
+  })
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = visibleProducts.findIndex(p => p.id === active.id)
+    const newIdx = visibleProducts.findIndex(p => p.id === over.id)
+    const reordered = arrayMove(visibleProducts, oldIdx, newIdx)
+    setProducts(prev => {
+      const map = new Map(reordered.map((p, i) => [p.id, i]))
+      return prev.map(p => map.has(p.id) ? { ...p, sort_order: map.get(p.id)! } : p)
+    })
+    const updates = reordered.map((p, i) => ({ id: p.id, sort_order: i }))
+    const { error } = await supabase.from('products').upsert(updates, { onConflict: 'id' })
+    if (error) toast.error('排序儲存失敗')
+  }
 
   // ── 單筆操作 ──────────────────────────────────
   const toggleAvailable = async (product: Product) => {
@@ -354,9 +390,11 @@ export default function AdminProductsClient({
       {/* Products table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="px-2 py-3 w-6"></th>
                 <th className="px-3 py-3 w-8">
                   <input
                     type="checkbox"
@@ -377,70 +415,78 @@ export default function AdminProductsClient({
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500">操作</th>
               </tr>
             </thead>
+            <SortableContext items={visibleProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
             <tbody>
               {visibleProducts.map((p, idx) => {
                 const isSelected = selected.has(p.id)
                 return (
-                  <tr key={p.id} className={`border-b border-gray-50 transition-colors ${isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'}`}>
-                    <td className="px-3 py-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(p.id)}
-                        className="accent-[#e85d26] w-4 h-4 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-2 py-3 text-center text-xs text-gray-400">{idx + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
-                        {p.images?.[0] ? (
-                          <Image src={p.images[0]} alt={p.name} width={40} height={40} className="object-cover w-full h-full" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-lg">📦</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[#1a1a1a] line-clamp-1">{p.name}</p>
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      {p.collection_id
-                        ? <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{collections.find(c => c.id === p.collection_id)?.name ?? '—'}</span>
-                        : <span className="text-xs text-gray-300">—</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-gray-500">
-                      {(p.categories as { emoji?: string; name: string } | undefined)?.name ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold">NT$ {p.price.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center hidden sm:table-cell text-gray-500">
-                      {p.stock === -1 ? '∞' : p.stock}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => toggleAvailable(p)} className={p.is_available ? 'text-green-500' : 'text-gray-300'}>
-                        {p.is_available ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-center hidden sm:table-cell">
-                      <button onClick={() => toggleFeatured(p)} className={p.is_featured ? 'text-[#e85d26]' : 'text-gray-300'}>
-                        {p.is_featured ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors">
-                          <Pencil size={14} />
+                  <SortableRow key={p.id} id={p.id} isSelected={isSelected}>
+                    {(dragProps) => (<>
+                      <td className="px-2 py-3 text-gray-300 cursor-grab active:cursor-grabbing" {...dragProps}>
+                        <GripVertical size={14} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(p.id)}
+                          className="accent-[#e85d26] w-4 h-4 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-2 py-3 text-center text-xs text-gray-400">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
+                          {p.images?.[0] ? (
+                            <Image src={p.images[0]} alt={p.name} width={40} height={40} className="object-cover w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-lg">📦</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-[#1a1a1a] line-clamp-1">{p.name}</p>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {p.collection_id
+                          ? <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{collections.find(c => c.id === p.collection_id)?.name ?? '—'}</span>
+                          : <span className="text-xs text-gray-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-gray-500">
+                        {(p.categories as { emoji?: string; name: string } | undefined)?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">NT$ {p.price.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell text-gray-500">
+                        {p.stock === -1 ? '∞' : p.stock}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => toggleAvailable(p)} className={p.is_available ? 'text-green-500' : 'text-gray-300'}>
+                          {p.is_available ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
                         </button>
-                        <button onClick={() => handleDelete(p)} className="p-1.5 hover:bg-red-50 text-red-400 rounded-lg transition-colors">
-                          <Trash2 size={14} />
+                      </td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell">
+                        <button onClick={() => toggleFeatured(p)} className={p.is_featured ? 'text-[#e85d26]' : 'text-gray-300'}>
+                          {p.is_featured ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
                         </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => handleDelete(p)} className="p-1.5 hover:bg-red-50 text-red-400 rounded-lg transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </>)}
+                  </SortableRow>
                 )
               })}
             </tbody>
+            </SortableContext>
           </table>
+          </DndContext>
           {visibleProducts.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <p>{activeCollection !== null ? '此批次尚無商品' : '尚無商品，點選「新增商品」開始'}</p>

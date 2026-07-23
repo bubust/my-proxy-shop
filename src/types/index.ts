@@ -30,6 +30,8 @@ export interface Product {
   tags: string[]
   colors: string[]
   sizes: string[]
+  size_prices: Record<string, number> | null
+  sort_order: number | null
   cost_price: number | null
   note: string | null
   collection_id: number | null

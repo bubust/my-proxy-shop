@@ -18,8 +18,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
 
   const images = product.images?.length > 0 ? product.images : [null]
-  const discount = product.original_price && product.original_price > product.price
-    ? Math.round((1 - product.price / product.original_price) * 100)
+  const displayPrice = (selectedSize && product.size_prices?.[selectedSize]) || product.price
+  const discount = product.original_price && product.original_price > displayPrice
+    ? Math.round((1 - displayPrice / product.original_price) * 100)
     : null
   const outOfStock = product.stock === 0
 
@@ -37,7 +38,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     addToCart({
       product_id: product.id,
       name: product.name,
-      price: product.price,
+      price: displayPrice,
       image: images[0],
       quantity: qty,
       size: selectedSize ?? undefined,
@@ -100,7 +101,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <h1 className="text-xl md:text-2xl font-bold text-[#1a1a1a] mt-3 mb-2 leading-snug">{product.name}</h1>
 
           <div className="flex items-baseline gap-3 mb-4">
-            <span className="text-3xl font-bold text-[#e85d26]">NT$ {product.price.toLocaleString()}</span>
+            <span className="text-3xl font-bold text-[#e85d26]">NT$ {displayPrice.toLocaleString()}</span>
             {product.original_price && (
               <span className="text-base text-gray-400 line-through">NT$ {product.original_price.toLocaleString()}</span>
             )}

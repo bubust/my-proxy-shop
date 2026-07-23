@@ -113,6 +113,9 @@ export default function ProductFormModal({
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [colors, setColors] = useState<string[]>(product?.colors ?? [])
   const [sizes, setSizes] = useState<string[]>(product?.sizes ?? [])
+  const [sizePrices, setSizePrices] = useState<Record<string, string>>(
+    product?.size_prices ? Object.fromEntries(Object.entries(product.size_prices).map(([k, v]) => [k, String(v)])) : {}
+  )
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -191,6 +194,13 @@ export default function ProductFormModal({
       tags,
       colors,
       sizes,
+      size_prices: sizes.length > 0
+        ? (() => {
+            const sp: Record<string, number> = {}
+            sizes.forEach(s => { if (sizePrices[s]) sp[s] = parseFloat(sizePrices[s]) })
+            return Object.keys(sp).length > 0 ? sp : null
+          })()
+        : null,
       images,
       collection_id: data.collection_id ? parseInt(data.collection_id) : null,
       updated_at: new Date().toISOString(),
@@ -345,7 +355,39 @@ export default function ProductFormModal({
             </div>
           )}
 
-          <CheckboxGroup label="尺寸" options={SIZE_OPTIONS} selected={sizes} onChange={setSizes} />
+          <CheckboxGroup
+            label="尺寸"
+            options={SIZE_OPTIONS}
+            selected={sizes}
+            onChange={(newSizes) => {
+              setSizes(newSizes)
+              setSizePrices(prev => {
+                const next: Record<string, string> = {}
+                newSizes.forEach(s => { if (prev[s]) next[s] = prev[s] })
+                return next
+              })
+            }}
+          />
+          {sizes.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1.5 block">尺寸各別價格（不填則使用代購價格）</label>
+              <div className="grid grid-cols-2 gap-2">
+                {sizes.map(s => (
+                  <div key={s} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="text-sm font-medium text-gray-700 w-8 shrink-0">{s}</span>
+                    <span className="text-xs text-gray-400">NT$</span>
+                    <input
+                      type="number"
+                      placeholder="同代購價"
+                      value={sizePrices[s] ?? ''}
+                      onChange={e => setSizePrices(prev => ({ ...prev, [s]: e.target.value }))}
+                      className="flex-1 bg-transparent text-sm focus:outline-none min-w-0"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <CheckboxGroup label="顏色" options={COLOR_OPTIONS} selected={colors} onChange={setColors} />
 
           <div>
